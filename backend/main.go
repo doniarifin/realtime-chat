@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"realtime-chat/internal/hub"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,38 +19,43 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println(err)
-		return
-	}
+func handler(h *hub.Hub) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		username := r.URL.Query().Get("username")
+		if username == "" {
+			username = fmt.Sprintf("anon-%d", time.Now().Unix()%1000)
+		}
 
-	defer conn.Close()
-
-	for {
-		messageType, p, err := conn.ReadMessage()
-
+		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Println(err)
+			log.Println("upgrade:", err)
 			return
 		}
 
-		if err := conn.WriteMessage(messageType, p); err != nil {
-			log.Println(err)
-			return
+		client := hub.NewClient(conn, h, username)
+		h.Register <- client
+
+		// Notify join
+		h.Broadcast <- hub.Message{
+			Type:    "join",
+			Sender:  username,
+			Content: fmt.Sprintf("%s joined", username),
 		}
 
+		go client.WriteMessage()
+		go client.ReadMessage()
 	}
-
 }
 
 func main() {
-	http.HandleFunc("/ws", handler)
-	fmt.Println("websocker started on :8080")
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		fmt.Println("error starting server:", err)
-		return
+	h := hub.New()
+	go h.Run()
+
+	// rute websocket
+	http.HandleFunc("/ws", handler(h))
+
+	fmt.Println("WebSocket server started on :8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Println("error starting server:", err)
 	}
 }
