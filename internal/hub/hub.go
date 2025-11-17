@@ -2,14 +2,16 @@ package hub
 
 import (
 	"sync"
+	"time"
 )
 
 // Message is the structure broadcasted between clients
 type Message struct {
-	Type    string `json:"type"`
-	Sender  string `json:"sender"`
-	Room    string `json:"room,omitempty"`
-	Content string `json:"content"`
+	Type    string     `json:"type"`
+	Sender  string     `json:"sender"`
+	Room    string     `json:"room,omitempty"`
+	Content string     `json:"content"`
+	Time    *time.Time `json:"time"`
 }
 
 type Hub struct {

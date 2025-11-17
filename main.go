@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,15 +22,39 @@ var upgrader = websocket.Upgrader{
 
 func handler(h *hub.Hub) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		username := r.URL.Query().Get("username")
-		if username == "" {
-			username = fmt.Sprintf("anon-%d", time.Now().Unix()%1000)
-		}
+		// username := r.URL.Query().Get("username")
+		// if username == "" {
+		// 	username = fmt.Sprintf("anon-%d", time.Now().Unix()%1000)
+		// }
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("upgrade:", err)
 			return
+		}
+
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("failed to read init payload:", err)
+			conn.Close()
+			return
+		}
+
+		var initPayload struct {
+			Type     string `json:"type"`
+			Username string `json:"username"`
+			Content  string `json:"content"`
+		}
+
+		if err := json.Unmarshal(msg, &initPayload); err != nil {
+			log.Println("invalid init payload:", err)
+			conn.Close()
+			return
+		}
+
+		username := initPayload.Username
+		if username == "" {
+			username = fmt.Sprintf("anon-%d", time.Now().Unix()%1000)
 		}
 
 		client := hub.NewClient(conn, h, username)

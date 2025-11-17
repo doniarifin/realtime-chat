@@ -42,7 +42,7 @@ func (c *Client) ReadMessage() {
 
 		if err != nil {
 			log.Println(err)
-			return
+			break
 		}
 
 		var msg Message
@@ -53,7 +53,6 @@ func (c *Client) ReadMessage() {
 			msg.Sender = c.Username
 		}
 		c.hub.Broadcast <- msg
-
 	}
 }
 
